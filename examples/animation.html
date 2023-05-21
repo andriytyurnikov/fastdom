@@ -32,19 +32,20 @@
 		</style>
 
 		<div class="intro">An adaptation of the demo from the Google Developers article <a href="https://developers.google.com/chrome-developer-tools/docs/demos/too-much-layout/">Diagnosing forced synchronous layouts</a>. In the article, forced synchronous layouts are fixed by simply <em>not doing any reads at all</em>. Rather than this extreme solution, which will not be appropriate for many use cases, we instead use <strong>fastdom</strong> to intelligently defer and batch the DOM reads and writes, and get similar performance gains as a result.</div>
-		<label>Number of elements <input id="count" type="text" value="400" /></label>
+		<label>Number of elements <input id="count" type="text" value="400" size="6" /></label>
 		<button id="sync" class="active">Forced synchronous layout</button>
 		<button id="async">Run with FastDom</button>
 		<button id="noread">No DOM reads</button>
 		<button id="toggle">Start</button>
+		<label><input id="toggle_double_raf" type="checkbox">Use double RAF</label>
 
 		<div id='test'></div>
 
 		<script>
-
 			var moveMethod = 'sync',
-				count      = document.getElementById('count'),
-				test       = document.getElementById('test'),
+				doubleRAF 		= document.getElementById('toggle_double_raf').checked,
+				count      		= document.getElementById('count'),
+				test       		= document.getElementById('test'),
 				timestamp, raf, movers;
 
 			var mover = {
@@ -67,22 +68,33 @@
 				},
 				noread: function(m) {
 
-					// Simply use the array index
-					// as the top value, so no DOM
-					// read is required
-					mover.setLeft(movers[m], m);
+					// Equivalent result without measuring anything
+					var top = ((m * 20) + 150);
+					mover.setLeft(movers[m], top);
 				},
 				setLeft: function(mover, top) {
 					mover.style.transform = 'translateX( ' +((Math.sin(top + timestamp/1000) + 1) * 500) + 'px)';
 				}
 			};
 
-			function update(thisTimestamp) {
-				timestamp = thisTimestamp;
+			function updateMovers() {
 				for (var m = 0; m < movers.length; m++) {
 					mover[moveMethod](m);
 				}
-				raf = window.requestAnimationFrame(update);
+			}
+
+			function update(thisTimestamp) {
+				timestamp = thisTimestamp;
+
+				updateMovers()
+
+				if(doubleRAF) {
+					raf = requestAnimationFrame(() => {
+						raf = requestAnimationFrame(update)
+					})
+				} else {
+					raf = window.requestAnimationFrame(update)
+				}
 			}
 
 			function toggleAnim(e) {
@@ -124,9 +136,16 @@
 				moveMethod = method;
 			}
 
+			function toggleDoubleRAF() {
+				doubleRAF = !doubleRAF;
+				document.getElementById("toggle_double_raf").checked = doubleRAF
+			};
 			document.getElementById('toggle').addEventListener('click', toggleAnim);
 			document.getElementById('sync').addEventListener('click', function() {
 				setMethod('sync');
+			});
+			document.getElementById('toggle_double_raf').addEventListener('change', function() {
+				toggleDoubleRAF();
 			});
 			document.getElementById('async').addEventListener('click', function() {
 				setMethod('async');
